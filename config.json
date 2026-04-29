@@ -47,5 +47,19 @@
     "suffix": "" ,
     "cycle": 15,
     "_comment": "placeholder api just for testing, don't really fuck with the jokes"
+  },
+  {
+    "type": "Crypto",
+    "title": "Bitcoin Trends",
+    "cryptoId": "bitcoin",
+    "vs_currency": "usd",
+    "days": 7,
+    "chartType": "line"
+  },
+  {
+    "type": "Harvard",
+    "title": "Harvard Art",
+    "apiKey": "b389ff8d-032c-4a9e-9771-d44a9b1a7701",
+    "cycle": 20
   }
 ]

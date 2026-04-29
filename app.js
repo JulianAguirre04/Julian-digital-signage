@@ -72,6 +72,63 @@ async function loadWeather(url, title = 'Weather') {
   `;
 }
 
+async function loadCryptoChart(item) {
+  const url = `https://api.coingecko.com/api/v3/coins/${item.cryptoId}/market_chart?vs_currency=${item.vs_currency || 'usd'}&days=${item.days || 7}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  const prices = data.prices.map(([timestamp, price]) => ({
+    time: new Date(timestamp).toLocaleDateString(),
+    price: price.toFixed(2)
+  }));
+
+  const chartId = `cryptoChart_${item.cryptoId}`;
+  const containerDiv = document.createElement('div');
+  containerDiv.style.width = '100%';
+  containerDiv.style.height = '300px';
+  containerDiv.style.position = 'relative';
+  
+  const html = `
+    <div class="infoCard" style="width: 100%;">
+      <h2>${escapeHtml(item.title)}</h2>
+      <canvas id="${chartId}" width="400" height="300"></canvas>
+    </div>
+  `;
+  
+  setTimeout(() => {
+    const ctx = document.getElementById(chartId);
+    if (ctx) {
+      new Chart(ctx, {
+        type: item.chartType || 'line',
+        data: {
+          labels: prices.map(p => p.time),
+          datasets: [{
+            label: item.title,
+            data: prices.map(p => parseFloat(p.price)),
+            borderColor: '#6bff6b',
+            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+            tension: 0.4,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: { display: true }
+          },
+          scales: {
+            y: { beginAtZero: false }
+          }
+        }
+      });
+    }
+  }, 100);
+  
+  return html;
+}
+
 function escapeHtml(str) {
   return str
     .replaceAll('&', '&amp;')
@@ -154,7 +211,52 @@ async function loadApiCard(item) {
   `;
 }
 
+async function loadHarvardArt(item) {
+  try {
+    const url = `https://api.harvardartmuseums.org/object?apikey=${item.apiKey}&size=1&sort=random&hasImages=1`;
+    const res = await fetch(url);
+    const data = await res.json();
 
+    if (!data.records || data.records.length === 0) {
+      return `
+        <div class="infoCard">
+          <h2>${escapeHtml(item.title)}</h2>
+          <p>No artworks found.</p>
+        </div>
+      `;
+    }
+
+    const record = data.records[0];
+    let imageHtml = '';
+
+    // Extract image from IIIF if available
+    if (record.images && record.images.length > 0) {
+      const img = record.images[0];
+      if (img.iiifbaseuri) {
+        const imageUrl = `${img.iiifbaseuri}/full/400,/0/default.jpg`;
+        imageHtml = `<img src="${imageUrl}" alt="${escapeHtml(record.title)}" style="max-width: 100%; height: auto; margin: 10px 0;">`;
+      }
+    }
+
+    return `
+      <div class="infoCard">
+        <h2>${escapeHtml(item.title)}</h2>
+        <h3>${escapeHtml(record.title || 'Untitled')}</h3>
+        ${imageHtml}
+        <p style="font-size: 0.9rem; margin: 10px 0;"><strong>Artist:</strong> ${escapeHtml(record.people ? record.people.map(p => p.name).join(', ') : 'Unknown')}</p>
+        <p style="font-size: 0.9rem;"><strong>Date:</strong> ${escapeHtml(record.dated || 'Unknown')}</p>
+      </div>
+    `;
+  } catch (err) {
+    console.error('Harvard Art error:', err);
+    return `
+      <div class="infoCard">
+        <h2>${escapeHtml(item.title)}</h2>
+        <p>Failed to load artwork.</p>
+      </div>
+    `;
+  }
+}
 
 async function renderStaticItems() {
   const weatherBox = document.getElementById('weather');
@@ -163,6 +265,8 @@ async function renderStaticItems() {
   const weatherItems = staticItems.filter((item) => item.type === 'Weather');
   const imageItems = staticItems.filter((item) => item.type === 'Image');
   const apiItems = staticItems.filter((item) => item.type === 'API');
+  const cryptoItems = staticItems.filter((item) => item.type === 'Crypto');
+  const harvardItems = staticItems.filter((item) => item.type === 'Harvard');
 
   if (weatherItems.length) {
     try {
@@ -193,9 +297,31 @@ async function renderStaticItems() {
     }
   }
 
-  staticContent.innerHTML = imageMarkup || apiMarkup
-    ? `${imageMarkup}${apiMarkup}`
-    : '<p>Add Image or API items in config.json for pinned visuals.</p>';
+  let cryptoMarkup = '';
+  if (cryptoItems.length) {
+    try {
+      const cryptoCards = await Promise.all(cryptoItems.map((item) => loadCryptoChart(item)));
+      cryptoMarkup = cryptoCards.join('');
+    } catch (err) {
+      console.error('Failed to load crypto data:', err);
+      cryptoMarkup = '<div class="infoCard"><p>Crypto data unavailable.</p></div>';
+    }
+  }
+
+  let harvardMarkup = '';
+  if (harvardItems.length) {
+    try {
+      const harvardCards = await Promise.all(harvardItems.map((item) => loadHarvardArt(item)));
+      harvardMarkup = harvardCards.join('');
+    } catch (err) {
+      console.error('Failed to load Harvard Art data:', err);
+      harvardMarkup = '<div class="infoCard"><p>Harvard Art data unavailable.</p></div>';
+    }
+  }
+
+  staticContent.innerHTML = imageMarkup || apiMarkup || cryptoMarkup || harvardMarkup
+    ? `${imageMarkup}${apiMarkup}${cryptoMarkup}${harvardMarkup}`
+    : '<p>Add Image, API, Crypto, or Harvard items in config.json for pinned visuals.</p>';
 }
 
 async function showRssItem() {
