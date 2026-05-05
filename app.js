@@ -4,6 +4,7 @@ let rssItems = [];
 let staticItems = [];
 let currentRssIndex = 0;
 let staticRefreshTime = 60;
+let articleTimer = null;
 
 async function loadConfig() {
   try {
@@ -22,8 +23,11 @@ async function loadConfig() {
 
     startClock();
     await renderStaticItems();
+    await renderCrypto();
     startStaticRefresh();
+    startCryptoRefresh();
     startRssDisplay();
+
   } catch (err) {
     console.error("Failed to load config:", err);
   }
@@ -35,45 +39,72 @@ function startStaticRefresh() {
   }, staticRefreshTime * 1000);
 }
 
+async function renderCrypto() {
+  const cryptoBox   = document.getElementById('cryptoContent');
+  const cryptoItems = staticItems.filter((item) => item.type === 'Crypto');
+  if (!cryptoBox || !cryptoItems.length) return;
+
+  try {
+    const cards = await Promise.all(cryptoItems.map((item) => loadCryptoChart(item)));
+    cryptoBox.style.display = 'block';
+    cryptoBox.innerHTML = cards.join('');
+  } catch (err) {
+    cryptoBox.innerHTML = '<p>Crypto data unavailable.</p>';
+    cryptoBox.style.display = 'block';
+  }
+}
+
+function startCryptoRefresh() {
+  setInterval(renderCrypto, 60 * 60 * 1000);
+}
+
 function startRssDisplay() {
   showRssItem();
 
-  if (rssItems.length <= 1) {
-    return;
+  if (rssItems.length <= 1) return;
+
+  function scheduleNext() {
+    const currentItem = rssItems[currentRssIndex];
+    const maxItems = currentItem.maxItems || 5;
+    const waitTime = cycleTime * maxItems * 1000;
+
+    setTimeout(() => {
+      clearTimeout(articleTimer);
+      articleTimer = null;
+      currentRssIndex = (currentRssIndex + 1) % rssItems.length;
+      showRssItem();
+      scheduleNext();
+    }, waitTime);
   }
 
-  setInterval(() => {
-    currentRssIndex = (currentRssIndex + 1) % rssItems.length;
-    showRssItem();
-  }, cycleTime * 1000);
+  scheduleNext();
 }
 
 function startClock() {
   const clock = document.getElementById('clock');
-  // Check if clock element exists to avoid errors
-  if (!clock) return; 
+  if (!clock) return;
 
   setInterval(() => {
     const now = new Date();
     const time = now.toLocaleTimeString();
-    const date =now.toDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-    clock.innerHTML = time + '<br><span id="date">' + date + '</span>';
+    const date = now.toDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    clock.innerHTML = '<span id="time">' + time + '</span><span id="date">' + date + '</span>';
   }, 1000);
 }
 
 function getWeatherSymbol(code) {
-    if (code === 0)                return '☀️ Clear';
-    if (code === 1)                return '🌤️ Mostly Clear';
-    if (code === 2)                return '⛅️ Partly Cloudy';
-    if (code === 3)                return '☁️ Overcast';
-    if (code >= 45 && code <= 48) return '🌫️ Foggy';
-    if (code >= 51 && code <= 55) return '🌦️ Drizzle';
-    if (code >= 61 && code <= 65) return '🌧️ Rainy';
-    if (code >= 71 && code <= 77) return '❄️ Snowy';
-    if (code >= 80 && code <= 82) return '🌧️ Showers';
-    if (code >= 85 && code <= 86) return '🌨️ Snow Showers';
-    if (code >= 95 && code <= 99) return '⛈️ Thunderstorm';
-    return '🌡️ Unknown';
+  if (code === 0)                return '☀️ Clear';
+  if (code === 1)                return '🌤️ Mostly Clear';
+  if (code === 2)                return '⛅️ Partly Cloudy';
+  if (code === 3)                return '☁️ Overcast';
+  if (code >= 45 && code <= 48) return '🌫️ Foggy';
+  if (code >= 51 && code <= 55) return '🌦️ Drizzle';
+  if (code >= 61 && code <= 65) return '🌧️ Rainy';
+  if (code >= 71 && code <= 77) return '❄️ Snowy';
+  if (code >= 80 && code <= 82) return '🌧️ Showers';
+  if (code >= 85 && code <= 86) return '🌨️ Snow Showers';
+  if (code >= 95 && code <= 99) return '⛈️ Thunderstorm';
+  return '🌡️ Unknown';
 }
 
 async function loadWeather(url, title = 'Weather') {
@@ -84,33 +115,32 @@ async function loadWeather(url, title = 'Weather') {
   const wind = data.current.wind_speed_10m;
   const symbol = getWeatherSymbol(data.current.weather_code);
 
-  //Build the 3-day forecast
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   let forecastHTML = '';
   for (let i = 1; i <= 3; i++) {
-        const parts = data.daily.time[i].split('-');
-        const date = new Date(parts[0], parts[1] - 1, parts[2]);
-        const day = days[date.getDay()];
-        const high = Math.round(data.daily.temperature_2m_max[i]);
-        const low = Math.round(data.daily.temperature_2m_min[i]);
-        const icon = getWeatherSymbol(data.daily.weather_code[i]);
-        forecastHTML += `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-top: 1px solid rgba(148,163,184,0.2);">
-                <span style="width: 36px; color: #94a3b8;">${day}</span>
-                <span>${icon}</span>
-                <span style="color: #f87171;">${high}°</span>
-                <span style="color: #7dd3fc;">${low}°</span>
-            </div>
-        `;
-    }
+    const parts = data.daily.time[i].split('-');
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    const day = days[date.getDay()];
+    const high = Math.round(data.daily.temperature_2m_max[i]);
+    const low = Math.round(data.daily.temperature_2m_min[i]);
+    const icon = getWeatherSymbol(data.daily.weather_code[i]);
+    forecastHTML += `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-top: 1px solid rgba(148,163,184,0.2);">
+        <span style="width: 36px; color: #94a3b8;">${day}</span>
+        <span>${icon}</span>
+        <span style="color: #f87171;">${high}°</span>
+        <span style="color: #7dd3fc;">${low}°</span>
+      </div>
+    `;
+  }
 
   return `
     <div>
-       <h2>${escapeHtml(title)}</h2>
-            <p style="font-size: 1.4rem; margin: 4px 0 2px 0;">${symbol}</p>
-            <p style="font-size: 2rem; margin: 4px 0 2px 0;">${temp}°F</p>
-            <p style="margin: 0;">Wind: ${wind} mph</p>
-            <div style="margin-top: 10px;">${forecastHTML}</div>
+      <h2>${escapeHtml(title)}</h2>
+      <p style="font-size: 1.4rem; margin: 4px 0 2px 0;">${symbol}</p>
+      <p style="font-size: 2rem; margin: 4px 0 2px 0;">${temp}°F</p>
+      <p style="margin: 0;">Wind: ${wind} mph</p>
+      <div style="margin-top: 10px;">${forecastHTML}</div>
     </div>
   `;
 }
@@ -119,7 +149,9 @@ async function loadCryptoChart(item) {
   const url = `https://api.coingecko.com/api/v3/coins/${item.cryptoId}/market_chart?vs_currency=${item.vs_currency || 'usd'}&days=${item.days || 7}`;
 
   const res = await fetch(url);
+  if (!res.ok) throw new Error(`CoinGecko error: ${res.status}`);
   const data = await res.json();
+  if (!data.prices) throw new Error('No price data in response');
 
   const prices = data.prices.map(([timestamp, price]) => ({
     time: new Date(timestamp).toLocaleDateString(),
@@ -127,18 +159,14 @@ async function loadCryptoChart(item) {
   }));
 
   const chartId = `cryptoChart_${item.cryptoId}`;
-  const containerDiv = document.createElement('div');
-  containerDiv.style.width = '100%';
-  containerDiv.style.height = '300px';
-  containerDiv.style.position = 'relative';
-  
+
   const html = `
-    <div class="infoCard" style="width: 100%;">
-      <h2>${escapeHtml(item.title)}</h2>
-      <canvas id="${chartId}" width="400" height="300"></canvas>
+    <div class="cryptoCard">
+      <h3 style="margin:0 0 6px 0; font-size:0.95rem;">${escapeHtml(item.title)}</h3>
+      <div class="chartWrapper"><canvas id="${chartId}"></canvas></div>
     </div>
   `;
-  
+
   setTimeout(() => {
     const ctx = document.getElementById(chartId);
     if (ctx) {
@@ -149,17 +177,17 @@ async function loadCryptoChart(item) {
           datasets: [{
             label: item.title,
             data: prices.map(p => parseFloat(p.price)),
-            borderColor: '#6bff6b',
-            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+            borderColor: item.color || '#6bff6b',
+            backgroundColor: (item.color || '#6bff6b') + '1a',
             tension: 0.4,
             fill: true
           }]
         },
         options: {
           responsive: true,
-          maintainAspectRatio: true,
+          maintainAspectRatio: false,
           plugins: {
-            legend: { display: true }
+            legend: { display: false }
           },
           scales: {
             y: { beginAtZero: false }
@@ -168,7 +196,7 @@ async function loadCryptoChart(item) {
       });
     }
   }, 100);
-  
+
   return html;
 }
 
@@ -182,27 +210,69 @@ function escapeHtml(str) {
 }
 
 async function loadRss(url, maxItems = 5) {
-   const proxyUrl = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(url);
-    const res = await fetch(proxyUrl);
-    const data = await res.json();
+  const proxyUrl = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(url);
+  const res = await fetch(proxyUrl);
+  const data = await res.json();
 
-    console.log('rss2json status:', data.status, 'items:', data.items?.length);
+  if (data.status !== 'ok' || !data.items?.length) {
+    return '<div><h1>Feed Unavailable</h1><p>' + (data.message || 'No items found.') + '</p></div>';
+  }
 
-    if (data.status !== 'ok' || !data.items?.length) {
-        return '<div><h1>Feed Unavailable</h1><p>' + (data.message || 'No items found.') + '</p></div>';
-    }
+  const items = data.items.slice(0, maxItems);
 
-    const items = data.items.slice(0, maxItems);
-    const list = items.map(item => {
-    const decoded = item.title.replaceAll('&amp;', '&').replaceAll('&lt;', '<').replaceAll('&gt;', '>');
-    return '<li style="margin: 0.5rem 0;">' + escapeHtml(decoded) + '</li>';
-    }).join('');
+  let html = '<div class="article-feed">';
+  items.forEach((item, i) => {
+    const decoded = item.title
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>');
+    const desc = item.description
+      ? stripHtml(item.description).substring(0, 300) + '...'
+      : '';
+    const date = item.pubDate
+      ? new Date(item.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      : '';
 
-    return '<div><h1>' + escapeHtml(data.feed.title) + '</h1><ul style="font-size: 1.5rem; line-height: 1.4;">' + list + '</ul></div>';
+    html += `
+      <div class="article-card" style="display: ${i === 0 ? 'flex' : 'none'}" data-index="${i}">
+        <div class="article-source">${escapeHtml(data.feed.title)} <span class="article-date">${date}</span></div>
+        <h1 class="article-title">${escapeHtml(decoded)}</h1>
+        <div class="article-divider"></div>
+        <p class="article-desc">${escapeHtml(desc)}</p>
+        <div class="article-num">${i + 1} / ${items.length}</div>
+      </div>
+    `;
+  });
+  html += '</div>';
+
+  return html;
+}
+
+function stripHtml(html) {
+  const d = document.createElement('div');
+  d.innerHTML = html;
+  return d.textContent || d.innerText || '';
+}
+
+function cycleArticles() {
+  const cards = document.querySelectorAll('.article-card');
+  if (!cards.length) return;
+
+  let visible = 0;
+  cards.forEach((c, i) => { if (c.style.display !== 'none') visible = i; });
+
+  cards[visible].style.display = 'none';
+  const next = (visible + 1) % cards.length;
+  cards[next].style.display = 'flex';
+
+  articleTimer = setTimeout(cycleArticles, cycleTime * 1000);
 }
 
 function getValuePath(obj, path) {
-  return path.split('.').reduce((current, key) => current && typeof current === 'object' ? current[key] : undefined, obj);
+  return path.split('.').reduce(
+    (current, key) => current && typeof current === 'object' ? current[key] : undefined,
+    obj
+  );
 }
 
 async function loadApiCard(item) {
@@ -214,7 +284,7 @@ async function loadApiCard(item) {
 
   return `
     <div class="infoCard">
-      <h2>${escapeHtml(item.title || item.tile || 'API Data')}</h2>
+      <h2>${escapeHtml(item.title || 'API Data')}</h2>
       <p style="font-size: 1.1rem; margin: 0; line-height: 1.4;">${escapeHtml(item.prefix || '')}${escapeHtml(value)}${escapeHtml(item.suffix || '')}</p>
     </div>
   `;
@@ -227,110 +297,82 @@ async function loadHarvardArt(item) {
     const data = await res.json();
 
     if (!data.records || data.records.length === 0) {
-      return `
-        <div class="infoCard">
-          <h2>${escapeHtml(item.title)}</h2>
-          <p>No artworks found.</p>
-        </div>
-      `;
+      return '';
     }
 
     const record = data.records[0];
-    let imageHtml = '';
 
-    // Extract image from IIIF if available
     if (record.images && record.images.length > 0) {
       const img = record.images[0];
-      if (img.iiifbaseuri) {
+      if (img && img.iiifbaseuri) {
         const imageUrl = `${img.iiifbaseuri}/full/400,/0/default.jpg`;
-        imageHtml = `<img src="${imageUrl}" alt="${escapeHtml(record.title)}" style="max-width: 100%; height: auto; margin: 10px 0;">`;
+        return `<img src="${imageUrl}" alt="${escapeHtml(record.title || '')}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;display:block;">`;
       }
     }
 
-    return `
-      <div class="infoCard">
-        <h2>${escapeHtml(item.title)}</h2>
-        <h3>${escapeHtml(record.title || 'Untitled')}</h3>
-        ${imageHtml}
-        <p style="font-size: 0.9rem; margin: 10px 0;"><strong>Artist:</strong> ${escapeHtml(record.people ? record.people.map(p => p.name).join(', ') : 'Unknown')}</p>
-        <p style="font-size: 0.9rem;"><strong>Date:</strong> ${escapeHtml(record.dated || 'Unknown')}</p>
-      </div>
-    `;
+    return 'Failed to load image :(';
   } catch (err) {
     console.error('Harvard Art error:', err);
-    return `
-      <div class="infoCard">
-        <h2>${escapeHtml(item.title)}</h2>
-        <p>Failed to load artwork.</p>
-      </div>
-    `;
+    return 'Failed to load image :(';
   }
 }
 
 async function renderStaticItems() {
-  const weatherBox = document.getElementById('weather');
-  const staticContent = document.getElementById('staticContent');
+  const weatherBox   = document.getElementById('weather');
+  const imageBox     = document.getElementById('imageContent');
+  const apiBox       = document.getElementById('apiContent');
+  const harvardBox   = document.getElementById('harvardContent');
 
   const weatherItems = staticItems.filter((item) => item.type === 'Weather');
-  const imageItems = staticItems.filter((item) => item.type === 'Image');
-  const apiItems = staticItems.filter((item) => item.type === 'API');
-  const cryptoItems = staticItems.filter((item) => item.type === 'Crypto');
+  const imageItems   = staticItems.filter((item) => item.type === 'Image');
+  const apiItems     = staticItems.filter((item) => item.type === 'API');
   const harvardItems = staticItems.filter((item) => item.type === 'Harvard');
 
+  // Weather
   if (weatherItems.length) {
     try {
-      const weatherMarkup = await Promise.all(
+      const markup = await Promise.all(
         weatherItems.map((item) => loadWeather(item.URL, item.title || 'Denver Weather'))
       );
-      weatherBox.innerHTML = weatherMarkup.join('');
+      weatherBox.innerHTML = markup.join('');
     } catch (err) {
-      console.error('Failed to load weather:', err);
       weatherBox.innerHTML = '<p>Weather unavailable.</p>';
     }
-  } else {
-    weatherBox.innerHTML = '<p>No weather source configured.</p>';
   }
 
-  const imageMarkup = imageItems
-    .map((item) => `<img class="staticImage" src="${item.URL}" alt="Static signage image">`)
-    .join('');
+  // Image
+  if (imageItems.length) {
+    imageBox.style.display = 'block';
+    imageBox.innerHTML = imageItems.map((item) =>
+      `<img class="staticImage" src="${item.URL}" alt="Static signage image">`
+    ).join('');
+  }
 
-  let apiMarkup = '';
+  // API
   if (apiItems.length) {
     try {
-      const apiCards = await Promise.all(apiItems.map((item) => loadApiCard(item)));
-      apiMarkup = apiCards.join('');
+      const cards = await Promise.all(apiItems.map((item) => loadApiCard(item)));
+      apiBox.style.display = 'block';
+      apiBox.innerHTML = cards.map(c =>
+        c.replace('<div class="infoCard">', '').replace(/<\/div>\s*$/, '')
+      ).join('');
     } catch (err) {
-      console.error('Failed to load API data:', err);
-      apiMarkup = '<div class="infoCard"><p>API data unavailable.</p></div>';
+      apiBox.innerHTML = '<p>API data unavailable.</p>';
+      apiBox.style.display = 'block';
     }
   }
 
-  let cryptoMarkup = '';
-  if (cryptoItems.length) {
-    try {
-      const cryptoCards = await Promise.all(cryptoItems.map((item) => loadCryptoChart(item)));
-      cryptoMarkup = cryptoCards.join('');
-    } catch (err) {
-      console.error('Failed to load crypto data:', err);
-      cryptoMarkup = '<div class="infoCard"><p>Crypto data unavailable.</p></div>';
-    }
-  }
-
-  let harvardMarkup = '';
+  // Harvard Art
   if (harvardItems.length) {
     try {
-      const harvardCards = await Promise.all(harvardItems.map((item) => loadHarvardArt(item)));
-      harvardMarkup = harvardCards.join('');
+      const cards = await Promise.all(harvardItems.map((item) => loadHarvardArt(item)));
+      harvardBox.style.display = 'block';
+      harvardBox.innerHTML = cards.join('');
     } catch (err) {
-      console.error('Failed to load Harvard Art data:', err);
-      harvardMarkup = '<div class="infoCard"><p>Harvard Art data unavailable.</p></div>';
+      harvardBox.innerHTML = '<p>Harvard Art unavailable.</p>';
+      harvardBox.style.display = 'block';
     }
   }
-
-  staticContent.innerHTML = imageMarkup || apiMarkup || cryptoMarkup || harvardMarkup
-    ? `${imageMarkup}${apiMarkup}${cryptoMarkup}${harvardMarkup}`
-    : '<p>Add Image, API, Crypto, or Harvard items in config.json for pinned visuals.</p>';
 }
 
 async function showRssItem() {
@@ -341,9 +383,15 @@ async function showRssItem() {
     return;
   }
 
+  if (articleTimer) {
+    clearTimeout(articleTimer);
+    articleTimer = null;
+  }
+
   const item = rssItems[currentRssIndex];
   try {
     feedContent.innerHTML = await loadRss(item.URL, item.maxItems || 5);
+    articleTimer = setTimeout(cycleArticles, cycleTime * 1000);
   } catch (err) {
     console.error('Failed to load RSS feed:', err);
     feedContent.innerHTML = `

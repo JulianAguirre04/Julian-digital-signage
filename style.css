@@ -1,6 +1,7 @@
 html, body {
   margin: 0;
   height: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -10,7 +11,7 @@ body {
 }
 
 #app {
-  height: 100%;
+  height: 100vh;
   display: grid;
   grid-template-columns: minmax(280px, 360px) 1fr;
   gap: 16px;
@@ -18,6 +19,100 @@ body {
   box-sizing: border-box;
 }
 
+/* ── LEFT PANEL ─────────────────────────────────────────────── */
+#infoPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  background: rgba(148, 163, 184, 0.2);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 16px;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+#infoPanel .infoCard {
+  flex-shrink: 0;
+}
+
+/* ── RIGHT PANEL ────────────────────────────────────────────── */
+#rightPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+#feedPanel {
+  flex: 1;
+  background: rgba(148, 163, 184, 0.2);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 16px;
+  padding: 24px;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#feedContent {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* ── BOTTOM ROW (3 boxes) ───────────────────────────────────── */
+#bottomRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  height: 220px;
+  flex-shrink: 0;
+}
+
+#cryptoContent,
+#harvardContent,
+#imageContent {
+  background: rgba(148, 163, 184, 0.2);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 16px;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* stacked crypto layout */
+#cryptoContent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  overflow: auto;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.cryptoCard {
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  flex: 1 1 0;
+  min-height: 250px;
+}
+
+.chartWrapper {
+  flex: 1 1 0;
+  min-height: 48px;
+}
+
+#cryptoContent canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* ── SHARED CARD STYLE ──────────────────────────────────────── */
 .panel {
   background: rgba(148, 163, 184, 0.2);
   border: 1px solid rgba(148, 163, 184, 0.4);
@@ -25,13 +120,7 @@ body {
   padding: 24px;
   box-sizing: border-box;
   overflow: hidden;
-}
-
-#infoPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
+  min-height: 0;
 }
 
 .infoCard {
@@ -49,49 +138,8 @@ body {
 #clock {
   font-size: 2rem;
   font-weight: 700;
-}
-
-#feedPanel {
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-#feedContent {
-  flex: 1;
-  height: 100%;
-  overflow-y: auto;
-}
-
-#feedContent h1 {
-  font-size: 2rem;
-  margin-bottom: 16px;
-}
-
-#feedContent ul {
-  padding-left: 24px;
-  font-size: 1.5rem;
-  line-height: 1.6;
-}
-
-#feedContent li{
-  margin: 0.5rem 0;
-}
-
-#feedContent a {
-  color: #7dd3fc;
-  text-decoration: none;
-}
-
-#feedContent a:hover {
-  text-decoration: underline;
-}
-
-.staticImage {
-  width: 100%;
-  max-height: 200px;
-  object-fit: cover;
-  border-radius: 10px;
+  padding: 0;
+  margin: 0;
 }
 
 #date {
@@ -99,7 +147,86 @@ body {
   font-weight: 400;
   color: #94a3b8;
   display: block;
-  margin-top: -6px;
+  margin-top: 4px;
+}
+
+#weather {
+  flex-shrink: 0;
+}
+
+/* ── IMAGE ──────────────────────────────────────────────────── */
+.staticImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+  display: block;
+}
+
+/* ── ARTICLE CARDS ──────────────────────────────────────────── */
+.article-feed {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.article-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 10px 20px;
+}
+
+.article-source {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: #00d4ff;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.article-date {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.article-title {
+  font-size: clamp(1.4rem, 2.5vw, 2.4rem);
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0 0 20px 0;
+  color: #f0f0f0;
+}
+
+.article-divider {
+  width: 50px;
+  height: 3px;
+  background: #00d4ff;
+  border-radius: 2px;
+  margin-bottom: 20px;
+}
+
+.article-desc {
+  font-size: clamp(0.9rem, 1.3vw, 1.1rem);
+  line-height: 1.75;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.article-num {
+  margin-top: auto;
+  padding-top: 16px;
+  font-size: 12px;
+  color: #475569;
+  letter-spacing: 1px;
 }
 
 /* ── PORTRAIT ───────────────────────────────────────────────── */
@@ -112,50 +239,45 @@ body {
   }
 
   #infoPanel {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto;
-    gap: 10px;
-    overflow: visible;
-  }
-
-  .infoCard {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: hidden;
     padding: 12px;
   }
 
-  .infoCard h2 {
-    font-size: 0.9rem;
-    margin-bottom: 4px;
+  #infoPanel .infoCard {
+    flex: 1 1 0;
+    min-width: 0;
   }
 
   #clock {
     font-size: 1.6rem;
   }
 
-  /* Image takes right column, spans both rows */
-  #staticContent {
-    grid-column: 2;
-    grid-row: 1 / 3;
+  .infoCard h2 {
+    font-size: 0.9rem;
   }
 
-  .staticImage {
-    max-height: 160px;
-    width: 100%;
-    object-fit: cover;
+  #feedPanel {
+    flex: 0 0 38vh;
   }
 
-  #feedContent h1 {
-    font-size: 1.4rem;
-    margin-bottom: 12px;
+  #bottomRow {
+    grid-template-columns: 1fr 1fr;
+    height: auto;
   }
 
-  #feedContent ul {
-    font-size: 1.1rem;
-    line-height: 1.6;
-    padding-left: 16px;
+  #cryptoContent,
+  #harvardContent {
+    height: 325px;
   }
 
-  #feedContent li {
-    margin: 0.4rem 0;
+  #imageContent {
+    grid-column: 1 / -1;
+    height: 320px;
+  }
+
+  .article-title {
+    font-size: 1.3rem;
   }
 }

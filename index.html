@@ -3,22 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <title>Digital Signage</title>
-    <link rel = "stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="app">
-            <aside id="infoPanel" class="panel">
-                <section class="infoCard">
-                    <h2>Local Time</h2>
-                    <div id="clock"></div>
-                </section>
-                <section id="weather" class="infoCard"></section>
-                <section id="staticContent" class="infoCard"></section>
-            </aside>
 
+        <aside id="infoPanel" class="panel">
+            <section class="infoCard">
+                <h2>Local Time</h2>
+                <div id="clock"></div>
+            </section>
+            <section id="weather" class="infoCard"></section>
+            <section id="apiContent" class="infoCard" style="display:none"></section>
+        </aside>
+
+        <div id="rightPanel">
             <main id="feedPanel" class="panel">
                 <div id="feedContent"></div>
             </main>
+            <div id="bottomRow">
+                <div id="cryptoContent" class="panel" style="display:none"></div>
+                <div id="harvardContent" class="panel" style="display:none"></div>
+                <div id="imageContent" class="panel" style="display:none"></div>
+            </div>
+        </div>
+
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
