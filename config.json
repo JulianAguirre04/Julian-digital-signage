@@ -70,9 +70,7 @@
     "color": "#e00909"
   },
   {
-    "type": "Harvard",
-    "title": "Harvard Art",
-    "apiKey": "b389ff8d-032c-4a9e-9771-d44a9b1a7701",
+    "type": "ChicagoArt",
     "cycle": 20
   }
 ]

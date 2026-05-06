@@ -24,8 +24,10 @@ async function loadConfig() {
     startClock();
     await renderStaticItems();
     await renderCrypto();
+    await renderChicagoArt();
     startStaticRefresh();
     startCryptoRefresh();
+    startChicagoArtRefresh();
     startRssDisplay();
 
   } catch (err) {
@@ -56,6 +58,24 @@ async function renderCrypto() {
 
 function startCryptoRefresh() {
   setInterval(renderCrypto, 60 * 60 * 1000);
+}
+
+async function renderChicagoArt() {
+  const chicagoArtBox   = document.getElementById('chicagoArtContent');
+  const chicagoArtItems = staticItems.filter((item) => item.type === 'ChicagoArt');
+  if (!chicagoArtBox || !chicagoArtItems.length) return;
+
+  try {
+    const cards = await Promise.all(chicagoArtItems.map((item) => loadChicagoArt(item)));
+    chicagoArtBox.style.display = 'block';
+    chicagoArtBox.innerHTML = cards.join('');
+  } catch (err) {
+    chicagoArtBox.style.display = 'none';
+  }
+}
+
+function startChicagoArtRefresh() {
+  setInterval(renderChicagoArt, 1 * 60 * 1000);
 }
 
 function startRssDisplay() {
@@ -290,43 +310,65 @@ async function loadApiCard(item) {
   `;
 }
 
-async function loadHarvardArt(item) {
+function probeImages(candidates, timeoutMs = 6000) {
+  return new Promise((resolve) => {
+    if (!candidates.length) { resolve(null); return; }
+
+    let failed = 0;
+    const timer = setTimeout(() => resolve(null), timeoutMs);
+
+    candidates.forEach(({ url, title }) => {
+      const img = new Image();
+      img.onload = () => {
+        clearTimeout(timer);
+        resolve({ url, title });
+      };
+      img.onerror = () => {
+        if (++failed === candidates.length) {
+          clearTimeout(timer);
+          resolve(null);
+        }
+      };
+      img.src = url;
+    });
+  });
+}
+
+async function loadChicagoArt() {
   try {
-    const url = `https://api.harvardartmuseums.org/object?apikey=${item.apiKey}&size=1&sort=random&hasImages=1`;
+    const page = Math.floor(Math.random() * 1200) + 1;
+    const url = `https://api.artic.edu/api/v1/artworks?fields=id,title,image_id&limit=10&page=${page}`;
     const res = await fetch(url);
+    if (!res.ok) throw new Error(`AIC error: ${res.status}`);
     const data = await res.json();
 
-    if (!data.records || data.records.length === 0) {
-      return '';
-    }
+    if (!data.data || !data.data.length) return '';
 
-    const record = data.records[0];
+    const candidates = data.data
+      .filter((record) => record.image_id)
+      .map((record) => ({
+        url: `https://www.artic.edu/iiif/2/${record.image_id}/full/843,/0/default.jpg`,
+        title: record.title || ''
+      }));
 
-    if (record.images && record.images.length > 0) {
-      const img = record.images[0];
-      if (img && img.iiifbaseuri) {
-        const imageUrl = `${img.iiifbaseuri}/full/400,/0/default.jpg`;
-        return `<img src="${imageUrl}" alt="${escapeHtml(record.title || '')}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;display:block;">`;
-      }
-    }
+    const winner = await probeImages(candidates);
+    if (!winner) return '';
 
-    return 'Failed to load image :(';
+    return `<img src="${winner.url}" alt="${escapeHtml(winner.title)}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;display:block;">`;
   } catch (err) {
-    console.error('Harvard Art error:', err);
-    return 'Failed to load image :(';
+    console.error('Chicago Art error:', err);
+    return '';
   }
 }
 
 async function renderStaticItems() {
-  const weatherBox   = document.getElementById('weather');
-  const imageBox     = document.getElementById('imageContent');
-  const apiBox       = document.getElementById('apiContent');
-  const harvardBox   = document.getElementById('harvardContent');
+  const weatherBox = document.getElementById('weather');
+  const imageBox   = document.getElementById('imageContent');
+  const apiBox     = document.getElementById('apiContent');
 
   const weatherItems = staticItems.filter((item) => item.type === 'Weather');
   const imageItems   = staticItems.filter((item) => item.type === 'Image');
   const apiItems     = staticItems.filter((item) => item.type === 'API');
-  const harvardItems = staticItems.filter((item) => item.type === 'Harvard');
 
   // Weather
   if (weatherItems.length) {
@@ -362,17 +404,6 @@ async function renderStaticItems() {
     }
   }
 
-  // Harvard Art
-  if (harvardItems.length) {
-    try {
-      const cards = await Promise.all(harvardItems.map((item) => loadHarvardArt(item)));
-      harvardBox.style.display = 'block';
-      harvardBox.innerHTML = cards.join('');
-    } catch (err) {
-      harvardBox.innerHTML = '<p>Harvard Art unavailable.</p>';
-      harvardBox.style.display = 'block';
-    }
-  }
 }
 
 async function showRssItem() {
